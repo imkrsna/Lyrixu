@@ -1,0 +1,2 @@
+# Lyrixu
+Lyrics video generator
