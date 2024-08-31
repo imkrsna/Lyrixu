@@ -1,6 +1,13 @@
-from ext.editor import Editor
+from ext.helper import Project
+from ext.editor import LRC
+from ext.ocr import OCR
 
-PROJECT_PATH = "./"
-editor = Editor("https://youtu.be/q7mlB-adMBc", PROJECT_PATH, fps=0.5)
-editor.download_video()
-editor.extract_frames()
+PROJECT = Project(offset=60)
+lrc = LRC("https://youtu.be/CBwQcZ-Boc4", PROJECT)
+# lrc.download_video()
+# lrc.download_audio()
+lrc.extract_frames()
+print(lrc.generate_lrc())
+
+# ocr = OCR()
+# print(ocr.extract_pdf())
