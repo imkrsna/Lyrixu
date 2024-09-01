@@ -52,23 +52,40 @@ class LRC():
  
         # closing input clip
         clip.close()
-    
-    # def generate_lrc(self):
-    #     stamps = []
-    #     total_frames = len(listdir(self.PROJECT.extracts_path))
 
-    #     for i, frame in tqdm(enumerate(listdir(self.PROJECT.extracts_path)), desc="pasing frames..."):
-    #         # skipping offset
-    #         if (i < self.PROJECT.extract_offset): continue
-
-    #         frame_path = path.join(self.PROJECT.extracts_path, frame)
-    #         result = self.OCR.extract_text(frame_path)
-            
-    #         if (len(stamps) > 0):
-    #             if (stamps[-1][1] != result): stamps.append((i, result))
-    #         else:
-    #             stamps.append((i, result))
-    
     def generate_lrc(self):
-        stamp = self.OCR.extract_pdf(self.PROJECT.extract_frames_pdf)
-        return stamp
+        lyrics = self.get_lyrics()
+        # self.write_lrc(lyrics)
+        return self.read_lrc()
+
+    def get_lyrics(self):
+        stamp = self.OCR.extract_text(self.PROJECT.extract_frames_pdf)
+        lyrics = []
+        lyrics.append(stamp[0])
+        for text in stamp[1:]:
+            if (text[1] != lyrics[-1][1]):
+                lyrics.append(text)
+        
+        return lyrics
+
+    def write_lrc(self, lyrics: list):
+        lrc = ""
+        for lyric in lyrics:
+            lrc += f"[{lyric[0]}] {lyric[1].replace("\n", "\\n")}\n"
+        
+        with open(self.PROJECT.lyrics_file, 'w') as f:
+            f.write(lrc)
+    
+    def read_lrc(self):
+        lyrics = []
+        with open(self.PROJECT.lyrics_file, "r") as f:
+            data = f.read().split("\n")[:-1]
+            for item in data:
+                x = int(item.split(" ")[0][1:-1])
+                y = " ".join(item.split(" ")[1:]).replace("\\n", "\n")
+                lyrics.append((x, y))
+        return lyrics
+
+class Editor():
+    def __init__():
+        

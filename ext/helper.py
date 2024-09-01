@@ -10,7 +10,7 @@ class Project:
 
         self.input_video = "input.mp4"
         self.input_audio = "input.mp3"
-        self.extract_fps = 0.75
+        self.extract_fps = 1
         self.extract_offset = offset
 
         self.extract_crop = 80
@@ -19,7 +19,7 @@ class Project:
         self.input_audio_path = path.join(self.downloads_path, self.input_audio)
         self.extract_frames = path.join(self.extracts_path, "frame_{0:06d}.jpg")
         self.extract_frames_pdf = path.join(self.extracts_path, "frames.pdf") # TESTING
-        self.lyrics_file = path.join(self.exports_path, "lyrics.json")
+        self.lyrics_file = path.join(self.exports_path, "lyrics.txt")
         self.render_file = path.join(self.exports_path, "render.mp4")
 
         makedirs(self.downloads_path, exist_ok=True)
