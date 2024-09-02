@@ -1,91 +1,98 @@
+import re
 from os import path, listdir
-
-from .helper import Project
-from .ocr import OCR
-
-from pytubefix import YouTube
-from pytubefix.cli import on_progress
-
-from moviepy.editor import VideoFileClip
 from PIL import Image
+from ext.ocr import OCR
+from pytubefix import YouTube
+from ext.project import Project
+from pytubefix.cli import on_progress
+from moviepy.editor import VideoFileClip
 
-from tqdm import tqdm
-
-
-class LRC():
+class LRC:
     def __init__(self, url: str, PROJECT: Project):
-        self.url = url
+        # base project
         self.PROJECT = PROJECT
-        self.OCR = OCR()
-        self.video = YouTube(url=self.url, on_progress_callback=on_progress)
-    
+        self.ocr = OCR()
+
+        # video variables
+        self.url = url
+        self.video = YouTube(url=url, on_progress_callback=on_progress)
+
     def download_video(self):
-        # downloading video
         stream = self.video.streams.get_highest_resolution()
-        stream.download(output_path=self.PROJECT.downloads_path, filename=self.PROJECT.input_video)
-        
+        stream.download(output_path=self.PROJECT.downloads_path, filename=self.PROJECT.input_video_name)
+
     def download_audio(self):
-        # downloading audio
         stream = self.video.streams.get_audio_only()
-        stream.download(output_path=self.PROJECT.downloads_path, filename=self.PROJECT.input_audio)
-
-    def extract_frames(self):
-        # opening input clip
-        clip = VideoFileClip(self.PROJECT.input_video_path)
-        
-        # loop thought all frames
-        images = []
-        for i, frame in enumerate(clip.iter_frames(fps=self.PROJECT.extract_fps)):
-            image = Image.fromarray(frame)
-
-            # crop height offset
-            crop = self.PROJECT.extract_crop
-            width, height = image.width, image.height
-            image = image.crop((crop, crop, width - crop, height - crop))
-
-            # saving image
-            # image.save(self.PROJECT.extract_frames.format(i))
-            images.append(image)
-
-        # export pdf
-        images[0].save(self.PROJECT.extract_frames_pdf, save_all=True, append_images=images[1:])
- 
-        # closing input clip
-        clip.close()
-
-    def generate_lrc(self):
-        lyrics = self.get_lyrics()
-        # self.write_lrc(lyrics)
-        return self.read_lrc()
-
-    def get_lyrics(self):
-        stamp = self.OCR.extract_text(self.PROJECT.extract_frames_pdf)
-        lyrics = []
-        lyrics.append(stamp[0])
-        for text in stamp[1:]:
-            if (text[1] != lyrics[-1][1]):
-                lyrics.append(text)
-        
-        return lyrics
-
-    def write_lrc(self, lyrics: list):
-        lrc = ""
-        for lyric in lyrics:
-            lrc += f"[{lyric[0]}] {lyric[1].replace("\n", "\\n")}\n"
-        
-        with open(self.PROJECT.lyrics_file, 'w') as f:
-            f.write(lrc)
+        stream.download(output_path=self.PROJECT.downloads_path, filename=self.PROJECT.input_audio_name)
     
-    def read_lrc(self):
-        lyrics = []
-        with open(self.PROJECT.lyrics_file, "r") as f:
-            data = f.read().split("\n")[:-1]
-            for item in data:
-                x = int(item.split(" ")[0][1:-1])
-                y = " ".join(item.split(" ")[1:]).replace("\\n", "\n")
-                lyrics.append((x, y))
-        return lyrics
-
-class Editor():
-    def __init__():
+    def extract_frames(self):
+        # loading input video
+        clip = VideoFileClip(self.PROJECT.input_video)
         
+        # pdf set counter
+        counter = 1
+        counter_size = 0
+        images = {}
+
+        # looping and storing frames
+        for i, frame in enumerate(clip.iter_frames(fps=self.PROJECT.input_fps)):
+            if (counter_size >= self.PROJECT.input_stack):
+                counter += 1
+                counter_size = 0
+
+            # making pillow image from frame
+            image = Image.fromarray(frame)
+            width, height, margin = image.width, image.height, self.PROJECT.input_margin
+            
+            # cropping top and bottom for better readiblity
+            image = image.crop((0, margin, width, height - margin))
+            
+            # saving frame
+            image.save(self.PROJECT.input_frames.format(i))
+
+            # calculating images size so far
+            counter_size += path.getsize(self.PROJECT.input_frames.format(i))
+
+            # appending pdf page
+            try:
+                images[counter].append(image)
+            except KeyError:
+                images[counter] = [image]
+
+        
+        # making frames.pdf
+        for i in images.keys():
+            images[i][0].save(self.PROJECT.frames_pdf.format(i), save_all=True, append_images=images[i][1:])
+    
+    def generate_lyrics(self):
+        frame_files = re.findall("frames_[0-9]{4}.pdf", "\n".join(listdir(self.PROJECT.extracts_path)))
+        frame_files.sort() # safety sorting
+        
+        # creating raw_lyrics dict and file counter
+        raw_lyrics = {}
+        counter = 0
+
+        # looping throught returned result and filling raw_lyrics
+        for i, file in enumerate(frame_files):
+            lyrics = self.ocr.extract_text(self.PROJECT.frames_pdf.format(i+1))
+            for text in lyrics:
+                raw_lyrics[counter] = text
+                counter += 1
+        # raw_lyrics = self.ocr.extract_text(self.PROJECT.frames_pdf)
+        return raw_lyrics
+
+    def clean_lyrics(self, lyrics: dict):
+        new_lyrics = []
+        flag = False # stop check on first element
+        
+        for (i, text) in lyrics.items():
+            if flag:
+                if new_lyrics[-1][-1] != text:
+                    new_lyrics.append((i, text))
+            else:
+                new_lyrics.append((i, text))
+                flag = True
+        
+        # returning clean lyrics
+        return new_lyrics
+            
