@@ -1,11 +1,14 @@
 import re
+import json
 from os import path, listdir
 from PIL import Image
 from ext.ocr import OCR
 from pytubefix import YouTube
 from ext.project import Project
 from pytubefix.cli import on_progress
-from moviepy.editor import VideoFileClip
+from moviepy.editor import VideoFileClip, ImageClip, TextClip, CompositeVideoClip, AudioFileClip
+from moviepy.video.fx.fadein import fadein
+from moviepy.video.fx.fadeout import fadeout
 
 class LRC:
     def __init__(self, url: str, PROJECT: Project):
@@ -79,7 +82,14 @@ class LRC:
                 raw_lyrics[counter] = text
                 counter += 1
         # raw_lyrics = self.ocr.extract_text(self.PROJECT.frames_pdf)
-        return raw_lyrics
+        
+        # cleaning lyrics
+        raw_lyrics = self.clean_lyrics(raw_lyrics)
+
+        # saving lyrics file
+        with open(self.PROJECT.lyrics_file, "w") as f:
+            json.dump(raw_lyrics, f)
+
 
     def clean_lyrics(self, lyrics: dict):
         new_lyrics = []
@@ -93,6 +103,68 @@ class LRC:
                 new_lyrics.append((i, text))
                 flag = True
         
-        # returning clean lyrics
-        return new_lyrics
-            
+        # list to dict
+        lyrics_dict = {}
+        for item in new_lyrics:
+            lyrics_dict[item[0]] = item[1]
+
+        return lyrics_dict
+
+
+class Editor:
+    def __init__(self, PROJECT: Project):
+        self.PROJECT = PROJECT
+
+        # fonts
+        self.font = "./data/fonts/Ouders Regular Regular.ttf"
+
+        # audio
+        self.audio = AudioFileClip(self.PROJECT.input_audio)
+        
+        # duration from audio
+        self.duration = self.audio.duration
+        
+        # background
+        self.background = ImageClip(self.get_background()).set_duration(self.duration)
+    
+    def get_background(self):
+        return "./data/backgrounds/temp.jpeg"
+    
+    def get_lyrics(self):
+        # reading lyrics file
+        lyrics = {}
+        with open(self.PROJECT.lyrics_file, "r") as f:
+            lyrics = json.load(f)
+
+        # convering lyrics json to tupile list
+        flag = False
+        last = None
+        processed_lyrics = []
+        for item in list(lyrics.items())[::-1]:
+            if (flag):
+                processed_lyrics.append((item[1], int(item[0]), int(last[0])))
+                last = item
+            else:
+                processed_lyrics.append((item[1], int(item[0]), self.duration))
+                last = item
+                flag = True
+        
+        return processed_lyrics[::-1]
+
+
+    def generate_video(self):
+        lyrics = self.get_lyrics()
+
+        text_clips = []
+        for text, start_time, end_time in lyrics:
+            text_clip = TextClip(text, font=self.font, fontsize=20, color="white")
+            text_clip = text_clip.set_duration(end_time - start_time)
+            text_clip = fadein(text_clip, duration=0.5)  # Fade in effect
+            text_clip = fadeout(text_clip, duration=0.5)  # Fade out effect
+            text_clip.set_start(start_time).set_end(end_time)
+            text_clips.append(text_clip)
+        
+
+        video = CompositeVideoClip([self.background] + text_clips)
+        video = video.set_audio(self.audio)
+        video.write_videofile(self.PROJECT.render_file, fps=24)
