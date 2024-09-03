@@ -19,6 +19,7 @@ class LRC:
         # video variables
         self.url = url
         self.video = YouTube(url=url, on_progress_callback=on_progress)
+        self.duration = None
 
     def download_video(self):
         stream = self.video.streams.get_highest_resolution()
@@ -86,10 +87,42 @@ class LRC:
         # cleaning lyrics
         raw_lyrics = self.clean_lyrics(raw_lyrics)
 
+        audio = AudioFileClip(self.PROJECT.input_audio)
+        self.duration = audio.duration
+
         # saving lyrics file
         with open(self.PROJECT.lyrics_file, "w") as f:
             json.dump(raw_lyrics, f)
+        
+        # convering lyrics dict to tupile list
+        flag = False
+        last = None
+        processed_lyrics = []
+        for item in list(raw_lyrics.items())[::-1]:
+            if (flag):
+                processed_lyrics.append((item[1], int(item[0]), int(last[0])))
+                last = item
+            else:
+                processed_lyrics.append((item[1], int(item[0]), self.duration))
+                last = item
+                flag = True
+        
+        processed_lyrics = processed_lyrics[::-1]
 
+        # saving str file
+        srt = ""
+        for idx, item in enumerate(processed_lyrics):
+            srt += f"{idx}\n{self.timestamp(item[1])} --> {self.timestamp(item[2])}\n{item[0]}\n\n"
+        
+        with open(self.PROJECT.srt_file, "w") as f:
+            f.write(srt)
+
+    def timestamp(self, seconds: float):
+        seconds = int(seconds)
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        seconds = (seconds % 3600) % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d},000"
 
     def clean_lyrics(self, lyrics: dict):
         new_lyrics = []

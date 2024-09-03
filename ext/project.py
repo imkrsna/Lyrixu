@@ -20,6 +20,7 @@ class Project:
         self.output_frames = path.join(self.render_path, "frame_{0:08d}.jpg")
         self.frames_pdf = path.join(self.extracts_path, "frames_{0:04d}.pdf")
         self.lyrics_file = path.join(self.exports_path, "lyrics.json")
+        self.srt_file = path.join(self.exports_path, "lyrics.srt")
         self.render_file = path.join(self.exports_path, "render.mp4")
 
         # making folders
