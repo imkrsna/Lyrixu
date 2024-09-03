@@ -128,7 +128,7 @@ class Editor:
         self.background = ImageClip(self.get_background()).set_duration(self.duration)
     
     def get_background(self):
-        return "./data/backgrounds/temp.jpeg"
+        return "./data/backgrounds/temp.jpg"
     
     def get_lyrics(self):
         # reading lyrics file
@@ -153,18 +153,31 @@ class Editor:
 
 
     def generate_video(self):
+        # getting lyrics
         lyrics = self.get_lyrics()
 
         text_clips = []
         for text, start_time, end_time in lyrics:
+            if text == "": continue
+            
+            # creating new text clip
             text_clip = TextClip(text, font=self.font, fontsize=20, color="white")
+            
+            # calculating center position
+            v_w, v_h = self.background.size
+            t_w, t_h = text_clip.size
+            center_x = (v_w - t_w) // 2
+            center_y = (v_h - t_h) // 2
+
+            # setting properties
+            text_clip = text_clip.set_position((center_x, center_y))
             text_clip = text_clip.set_duration(end_time - start_time)
-            text_clip = fadein(text_clip, duration=0.5)  # Fade in effect
-            text_clip = fadeout(text_clip, duration=0.5)  # Fade out effect
-            text_clip.set_start(start_time).set_end(end_time)
+            text_clip = text_clip.crossfadein(duration=0.5)
+            text_clip = text_clip.crossfadeout(duration=0.5)
+            text_clip = text_clip.set_start(start_time).set_end(end_time)
             text_clips.append(text_clip)
         
 
         video = CompositeVideoClip([self.background] + text_clips)
         video = video.set_audio(self.audio)
-        video.write_videofile(self.PROJECT.render_file, fps=24)
+        video.write_videofile(self.PROJECT.render_file, audio=True, fps=24, threads=4, codec="libx264")
